@@ -224,8 +224,13 @@ def cumulative_score(fc, act, up_to_hour, metric):
     if mask.sum() == 0:
         return np.nan
     diff = f[mask] - a[mask]
-    return (float(np.mean(np.abs(diff)))    if metric == "MAE"
-            else float(np.sqrt(np.mean(diff**2))))
+    if metric == "MAE":
+        return float(np.mean(np.abs(diff)))
+    if metric == "RMSE":
+        return float(np.sqrt(np.mean(diff**2)))
+    # MAPE
+    a_nz = act[hrs][mask]
+    return float(np.mean(np.abs(diff / a_nz)) * 100)
 
 # ── Plotly helpers ────────────────────────────────────────────────────────────
 
@@ -340,6 +345,7 @@ def make_cumulative_figure(state, metric, df_fc, groups, actual_avg, last_comple
             hovertemplate=f"<b>{g}</b><br>Through hour %{{x}}<br>{metric}: %{{y:.2f}} MW<extra></extra>",
         ))
 
+    unit = "%" if metric == "MAPE" else "MW"
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(
@@ -347,7 +353,7 @@ def make_cumulative_figure(state, metric, df_fc, groups, actual_avg, last_comple
             font=dict(size=14, color="#e6edf3"),
         ),
         xaxis=dict(**AXIS_STYLE, title="Hour (cumulative through)", tickvals=eval_hours),
-        yaxis=dict(**AXIS_STYLE, title=f"{metric} (MW)"),
+        yaxis=dict(**AXIS_STYLE, title=f"{metric} ({unit})"),
         height=360,
         legend=dict(**LEGEND_STYLE, x=1.01, y=1, xanchor="left"),
     )
@@ -579,8 +585,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-cum_tabs = st.tabs(["📈 Cumulative MAE", "📈 Cumulative RMSE"])
-for tab, metric in zip(cum_tabs, ["MAE", "RMSE"]):
+cum_tabs = st.tabs(["📈 Cumulative MAE", "📈 Cumulative RMSE", "📈 Cumulative MAPE"])
+for tab, metric in zip(cum_tabs, ["MAE", "RMSE", "MAPE"]):
     with tab:
         cc1, cc2 = st.columns(2)
         for col, state in zip([cc1, cc2], ["NH", "VT"]):
