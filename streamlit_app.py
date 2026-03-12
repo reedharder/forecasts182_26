@@ -121,13 +121,13 @@ PLOTLY_LAYOUT = dict(
     paper_bgcolor="#0d1117",
     plot_bgcolor="#0d1117",
     font=dict(family="IBM Plex Mono, monospace", color="#c9d1d9", size=11),
-    legend=dict(bgcolor="#161b22", bordercolor="#21262d", borderwidth=1),
     margin=dict(l=50, r=20, t=50, b=50),
     hoverlabel=dict(bgcolor="#161b22", bordercolor="#21262d",
                     font=dict(family="IBM Plex Mono, monospace", size=12)),
 )
-# Reusable axis style — merged per-chart to avoid duplicate-kwarg collisions
-AXIS_STYLE = dict(gridcolor="#21262d", zerolinecolor="#21262d", tickcolor="#8b949e")
+# Axis and legend styles — passed explicitly per chart to avoid duplicate-kwarg errors
+AXIS_STYLE   = dict(gridcolor="#21262d", zerolinecolor="#21262d", tickcolor="#8b949e")
+LEGEND_STYLE = dict(bgcolor="#161b22", bordercolor="#21262d", borderwidth=1)
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
 
@@ -292,8 +292,7 @@ def make_ts_figure(state, df_fc, groups, actual_avg, last_complete):
                    ticktext=[str(h) for h in HOURS]),
         yaxis=dict(**AXIS_STYLE, title="Avg Load (MW)"),
         height=380,
-        legend=dict(**PLOTLY_LAYOUT["legend"], orientation="v",
-                    x=1.01, y=1, xanchor="left"),
+        legend=dict(**LEGEND_STYLE, orientation="v", x=1.01, y=1, xanchor="left"),
         hovermode="x unified",
     )
     return fig
@@ -350,7 +349,7 @@ def make_cumulative_figure(state, metric, df_fc, groups, actual_avg, last_comple
         xaxis=dict(**AXIS_STYLE, title="Hour (cumulative through)", tickvals=eval_hours),
         yaxis=dict(**AXIS_STYLE, title=f"{metric} (MW)"),
         height=360,
-        legend=dict(**PLOTLY_LAYOUT["legend"], x=1.01, y=1, xanchor="left"),
+        legend=dict(**LEGEND_STYLE, x=1.01, y=1, xanchor="left"),
     )
     return fig
 
