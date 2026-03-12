@@ -181,7 +181,7 @@ def load_forecasts(mtime: float) -> tuple[pd.DataFrame, list]:
                 errors="coerce",
             )
     df["State"] = df["State/Hour"].astype(str).str.strip().str.upper()
-    groups = sorted(df["Group"].unique())
+    groups = sorted([int(g) for g in df["Group"].unique()])
     return df, groups
 
 # ── Analysis helpers ──────────────────────────────────────────────────────────
@@ -243,31 +243,31 @@ def make_ts_figure(state, df_fc, groups, actual_avg, last_complete):
 
     fig = go.Figure()
 
-    # Individual group traces
+    # Individual group traces — hidden from legend, tooltip shows only on direct hover
     for i, g in enumerate(groups):
         fc = get_fc(df_fc, state, g)
         fig.add_trace(go.Scatter(
             x=HOURS, y=fc,
             mode="lines",
-            name=f"Group {g}",
+            name=f"Group {int(g)}",
+            showlegend=False,
             line=dict(color=GROUP_PALETTE[i % len(GROUP_PALETTE)], width=1.2),
             opacity=0.45,
-            legendgroup=f"group_{g}",
-            hovertemplate=f"<b>Group {g}</b><br>Hour: %{{x}}<br>Forecast: %{{y:.1f}} MW<extra></extra>",
+            hovertemplate=f"<b>Group {int(g)}</b>: %{{y:.1f}} MW<extra></extra>",
         ))
 
-    # Avg forecast
+    # Avg forecast — in legend, tooltip on direct hover only
     fig.add_trace(go.Scatter(
         x=HOURS, y=avg,
         mode="lines+markers",
         name="⌀ Avg Forecast",
+        showlegend=True,
         line=dict(color="#ffa657", width=3, dash="dot"),
         marker=dict(size=5, color="#ffa657"),
-        hovertemplate="<b>Avg Forecast</b><br>Hour: %{x}<br>%{y:.1f} MW<extra></extra>",
-        zorder=10,
+        hovertemplate="<b>Avg Forecast</b>: %{y:.1f} MW<extra></extra>",
     ))
 
-    # Actual load
+    # Actual load — in legend, tooltip on direct hover only
     avail = [(h, act[h]) for h in HOURS if not np.isnan(act[h])]
     if avail:
         xv, yv = zip(*avail)
@@ -275,10 +275,10 @@ def make_ts_figure(state, df_fc, groups, actual_avg, last_complete):
             x=xv, y=yv,
             mode="lines+markers",
             name="Actual Load",
+            showlegend=True,
             line=dict(color="#f85149", width=3),
             marker=dict(size=7, color="#f85149", symbol="circle"),
-            hovertemplate="<b>Actual</b><br>Hour: %{x}<br>%{y:.1f} MW<extra></extra>",
-            zorder=11,
+            hovertemplate="<b>Actual</b>: %{y:.1f} MW<extra></extra>",
         ))
 
     subtitle = f"Data through end of hour {lc}" if lc is not None else "No complete hours yet"
@@ -293,7 +293,7 @@ def make_ts_figure(state, df_fc, groups, actual_avg, last_complete):
         yaxis=dict(**AXIS_STYLE, title="Avg Load (MW)"),
         height=380,
         legend=dict(**LEGEND_STYLE, orientation="v", x=1.01, y=1, xanchor="left"),
-        hovermode="x unified",
+        hovermode="closest",
     )
     return fig
 
@@ -312,14 +312,14 @@ def make_cumulative_figure(state, metric, df_fc, groups, actual_avg, last_comple
     all_scores = {}
     for g in groups:
         fc = get_fc(df_fc, state, g)
-        all_scores[str(g)] = [cumulative_score(fc, act, h, metric) for h in eval_hours]
+        all_scores[str(int(g))] = [cumulative_score(fc, act, h, metric) for h in eval_hours]
     avg = avg_forecast(df_fc, groups, state)
     all_scores["Avg Forecast"] = [cumulative_score(avg, act, h, metric) for h in eval_hours]
 
     # Find ever-top-5
     ever_top5 = {"Avg Forecast"}
     for i in range(len(eval_hours)):
-        gs = {g: all_scores[g][i] for g in map(str, groups) if not np.isnan(all_scores[g][i])}
+        gs = {g: all_scores[g][i] for g in [str(int(x)) for x in groups] if not np.isnan(all_scores[g][i])}
         ever_top5.update(sorted(gs, key=gs.get)[:5])
 
     fig = go.Figure()
@@ -364,7 +364,7 @@ def build_metrics_df(state, df_fc, groups, actual_avg, last_complete):
     for g in groups:
         fc = get_fc(df_fc, state, g)
         mae, mape, rmse = score(fc, act, hrs)
-        rows.append({"Group": str(g), "MAE": mae, "MAPE (%)": mape, "RMSE": rmse})
+        rows.append({"Group": str(int(g)), "MAE": mae, "MAPE (%)": mape, "RMSE": rmse})
     mae, mape, rmse = score(avg_forecast(df_fc, groups, state), act, hrs)
     rows.append({"Group": "⌀ Avg Forecast", "MAE": mae, "MAPE (%)": mape, "RMSE": rmse})
     return pd.DataFrame(rows).set_index("Group")
@@ -490,7 +490,7 @@ with col3:
     <div class="metric-card">
       <div class="metric-label">Forecast Groups</div>
       <div class="metric-value">{len(groups)}</div>
-      <div class="metric-sub">Groups: {", ".join(str(g) for g in groups[:6])}{"…" if len(groups) > 6 else ""}</div>
+      <div class="metric-sub">Groups: {", ".join(str(int(g)) for g in groups[:6])}{"…" if len(groups) > 6 else ""}</div>
     </div>""", unsafe_allow_html=True)
 with col4:
     total_readings = int(counts.sum())
