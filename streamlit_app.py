@@ -2,7 +2,6 @@
 #  ISO-NE Load Forecast Dashboard  —  Streamlit App
 # =============================================================================
 
-import os
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -16,7 +15,7 @@ st.set_page_config(
     page_title="ISO-NE Load Forecast Dashboard",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ── Styling ───────────────────────────────────────────────────────────────────
@@ -122,25 +121,21 @@ PLOTLY_LAYOUT = dict(
     paper_bgcolor="#0d1117",
     plot_bgcolor="#0d1117",
     font=dict(family="IBM Plex Mono, monospace", color="#c9d1d9", size=11),
-    xaxis=dict(gridcolor="#21262d", zerolinecolor="#21262d", tickcolor="#8b949e"),
-    yaxis=dict(gridcolor="#21262d", zerolinecolor="#21262d", tickcolor="#8b949e"),
     legend=dict(bgcolor="#161b22", bordercolor="#21262d", borderwidth=1),
     margin=dict(l=50, r=20, t=50, b=50),
     hoverlabel=dict(bgcolor="#161b22", bordercolor="#21262d",
                     font=dict(family="IBM Plex Mono, monospace", size=12)),
 )
+# Reusable axis style — merged per-chart to avoid duplicate-kwarg collisions
+AXIS_STYLE = dict(gridcolor="#21262d", zerolinecolor="#21262d", tickcolor="#8b949e")
 
-# ── Data persistence helpers ──────────────────────────────────────────────────
-
-def save_upload(uploaded_file, path: Path):
-    with open(path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+# ── Data helpers ──────────────────────────────────────────────────────────────
 
 def file_mtime(path: Path) -> str:
     if path.exists():
         ts = datetime.fromtimestamp(path.stat().st_mtime)
         return ts.strftime("%b %d, %Y  %H:%M:%S")
-    return "Not uploaded"
+    return "Not found"
 
 # ── Cached data loaders ───────────────────────────────────────────────────────
 
@@ -293,9 +288,9 @@ def make_ts_figure(state, df_fc, groups, actual_avg, last_complete):
             text=f"{STATE_LABELS[state]}  ·  <span style='color:#8b949e;font-size:13px'>{subtitle}</span>",
             font=dict(size=15, color="#e6edf3"),
         ),
-        xaxis=dict(**PLOTLY_LAYOUT["xaxis"], title="Hour of Day", tickvals=HOURS,
+        xaxis=dict(**AXIS_STYLE, title="Hour of Day", tickvals=HOURS,
                    ticktext=[str(h) for h in HOURS]),
-        yaxis=dict(**PLOTLY_LAYOUT["yaxis"], title="Avg Load (MW)"),
+        yaxis=dict(**AXIS_STYLE, title="Avg Load (MW)"),
         height=380,
         legend=dict(**PLOTLY_LAYOUT["legend"], orientation="v",
                     x=1.01, y=1, xanchor="left"),
@@ -352,8 +347,8 @@ def make_cumulative_figure(state, metric, df_fc, groups, actual_avg, last_comple
             text=f"{STATE_LABELS[state]}  ·  Cumulative {metric}",
             font=dict(size=14, color="#e6edf3"),
         ),
-        xaxis=dict(**PLOTLY_LAYOUT["xaxis"], title="Hour (cumulative through)", tickvals=eval_hours),
-        yaxis=dict(**PLOTLY_LAYOUT["yaxis"], title=f"{metric} (MW)"),
+        xaxis=dict(**AXIS_STYLE, title="Hour (cumulative through)", tickvals=eval_hours),
+        yaxis=dict(**AXIS_STYLE, title=f"{metric} (MW)"),
         height=360,
         legend=dict(**PLOTLY_LAYOUT["legend"], x=1.01, y=1, xanchor="left"),
     )
@@ -392,7 +387,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     st.divider()
 
-    # ── Forecast upload (persist to disk) ────────────────────────────────────
+    # ── Forecast file status ──────────────────────────────────────────────────
     st.markdown("**📋 Forecast File**")
     fc_status = "badge-ok" if FORECAST_PATH.exists() else "badge-err"
     fc_label  = "Loaded" if FORECAST_PATH.exists() else "Missing"
@@ -401,16 +396,16 @@ with st.sidebar:
         f'<span style="font-size:11px;color:#6e7681">{file_mtime(FORECAST_PATH)}</span>',
         unsafe_allow_html=True,
     )
-    fc_upload = st.file_uploader("Upload Forecasts_test.csv", type="csv",
-                                  key="fc_upload", label_visibility="collapsed")
-    if fc_upload:
-        save_upload(fc_upload, FORECAST_PATH)
-        st.cache_data.clear()
-        st.success("✅ Forecasts saved!")
+    st.markdown(
+        '<div style="font-size:11px;color:#6e7681;margin-top:4px">'
+        'Commit <code style="color:#8b949e">data/forecasts.csv</code> to the repo.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     st.divider()
 
-    # ── Actuals upload (re-upload each hour) ─────────────────────────────────
+    # ── Actuals file status ───────────────────────────────────────────────────
     st.markdown("**📡 ISO-NE Actuals**")
     act_status = "badge-ok" if ACTUAL_PATH.exists() else "badge-err"
     act_label  = "Loaded" if ACTUAL_PATH.exists() else "Missing"
@@ -419,20 +414,13 @@ with st.sidebar:
         f'<span style="font-size:11px;color:#6e7681">{file_mtime(ACTUAL_PATH)}</span>',
         unsafe_allow_html=True,
     )
-    act_upload = st.file_uploader(
-        "Upload updated ISO-NE CSV (re-upload each hour to refresh)",
-        type="csv", key="act_upload", label_visibility="collapsed",
-    )
-    if act_upload:
-        save_upload(act_upload, ACTUAL_PATH)
-        st.cache_data.clear()
-        st.success("✅ Actuals refreshed!")
-
     st.markdown(
-        '<div style="font-size:11px;color:#6e7681;margin-top:6px;line-height:1.6">'
-        '💡 Download the latest file from<br>'
+        '<div style="font-size:11px;color:#6e7681;margin-top:4px;line-height:1.7">'
+        'Replace <code style="color:#8b949e">data/isone_actual.csv</code> in the repo each hour.<br>'
+        '💡 Download from '
         '<a href="https://www.iso-ne.com/isoexpress/web/reports/load-and-demand/-/tree/five-min-zone-load" '
-        'target="_blank" style="color:#58a6ff">ISO-NE Load Reports</a> and re-upload hourly.'
+        'target="_blank" style="color:#58a6ff">ISO-NE Load Reports</a>, '
+        'rename, and push.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -469,7 +457,7 @@ if not FORECAST_PATH.exists() or not ACTUAL_PATH.exists():
     missing = []
     if not FORECAST_PATH.exists(): missing.append("Forecasts CSV")
     if not ACTUAL_PATH.exists():   missing.append("ISO-NE Actuals CSV")
-    st.warning(f"⚠️  Please upload the following files in the sidebar: **{', '.join(missing)}**")
+    st.warning(f"⚠️  Missing files in the repo's `data/` folder: **{', '.join(missing)}**")
     st.stop()
 
 # ── Load data ─────────────────────────────────────────────────────────────────
